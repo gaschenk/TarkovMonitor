@@ -1,16 +1,17 @@
 ﻿@using Humanizer
+@using Timer = System.Threading.Timer
 @inject GameWatcher eft
 
 <MudDialog>
     <DialogContent>
-        @if (eft.LogsPath != "")
+        @if (IsEftLogsPathSet)
         {
-        <MudSelect @bind-Value="selectedPath" Label="Open existing logs" HelperText="Choose which set of logs should be read from" OpenIcon="@Icons.Material.Filled.TextSnippet" AdornmentColor="Color.Secondary">
-            @foreach (DateTime folderDate in logFolders.Keys)
-            {
+            <MudSelect @bind-Value="selectedPath" Label="Open existing logs" HelperText="Choose which set of logs should be read from" OpenIcon="@Icons.Material.Filled.TextSnippet" AdornmentColor="Color.Secondary">
+                @foreach (DateTime folderDate in logFolders.Keys)
+                {
                     <MudSelectItem Value="@logFolders[folderDate]">@folderDate.ToLongDateString() - @folderDate.Humanize()</MudSelectItem>
-            }
-        </MudSelect>
+                }
+            </MudSelect>
         }
         else
         {
@@ -19,11 +20,15 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudCheckBox Disabled="!IsEftLogsPathSet" @bind-Checked="isReadAll">Read all logs</MudCheckBox>
         <MudButton Color="Color.Primary" OnClick="Submit">Ok</MudButton>
     </DialogActions>
 </MudDialog>
+
 @code {
     [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+    bool isReadAll = false;
 
     protected override void OnInitialized()
     {
@@ -37,13 +42,29 @@
 
     void Cancel() => MudDialog.Cancel();
 
-public void Submit()
+    public bool IsEftLogsPathSet => eft.LogsPath != "";
+
+    public void Submit()
     {
-        // Check if a path was selected, and if so, load the logs from that path
-        if (selectedPath != "")
+        if (isReadAll)
         {
-            eft.ProcessLogs(selectedPath);
+            // Ignore newest log as it may be in use
+            var tempLogFolders = logFolders.OrderByDescending(log => log.Key).Skip(1).Reverse();
+            foreach (var (_, logPath) in tempLogFolders)
+            {
+                eft.ProcessLogs(logPath);
+            }
         }
+        else
+        {
+            // Check if a path was selected, and if so, load the logs from that path
+            if (selectedPath != "")
+            {
+                eft.ProcessLogs(selectedPath);
+            }
+        }
+
         MudDialog.Close(DialogResult.Ok(true));
     }
+
 }
